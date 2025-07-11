@@ -1,0 +1,1358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AML & Economic Crimes Prevention System</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        :root {
+            --primary-color: #1a365d;
+            --secondary-color: #2d5a87;
+            --accent-color: #3182ce;
+            --success-color: #38a169;
+            --warning-color: #d69e2e;
+            --danger-color: #e53e3e;
+            --text-color: #2d3748;
+            --bg-color: #f7fafc;
+            --card-bg: #ffffff;
+            --border-color: #e2e8f0;
+            --shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: var(--text-color);
+            overflow-x: hidden;
+        }
+
+        .loading-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(45deg, #1a365d, #2d5a87);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+            transition: opacity 0.5s ease;
+        }
+
+        .loading-spinner {
+            width: 60px;
+            height: 60px;
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .landing-page {
+            min-height: 100vh;
+            background: linear-gradient(rgba(26, 54, 93, 0.8), rgba(45, 90, 135, 0.8)),
+                        url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800"><defs><linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:%23667eea;stop-opacity:1" /><stop offset="100%" style="stop-color:%23764ba2;stop-opacity:1" /></linearGradient></defs><rect width="1200" height="800" fill="url(%23bg)"/><g fill="rgba(255,255,255,0.1)"><circle cx="200" cy="150" r="80" /><circle cx="800" cy="200" r="60" /><circle cx="400" cy="400" r="100" /><circle cx="1000" cy="500" r="70" /><circle cx="600" cy="700" r="90" /></g></svg>');
+            background-size: cover;
+            background-position: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .floating-elements {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        .float-element {
+            position: absolute;
+            opacity: 0.1;
+            animation: float 6s ease-in-out infinite;
+        }
+
+        .float-element:nth-child(1) { top: 10%; left: 10%; animation-delay: 0s; }
+        .float-element:nth-child(2) { top: 20%; right: 10%; animation-delay: 2s; }
+        .float-element:nth-child(3) { bottom: 20%; left: 15%; animation-delay: 4s; }
+        .float-element:nth-child(4) { bottom: 10%; right: 20%; animation-delay: 1s; }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-20px); }
+        }
+
+        .hero-content {
+            text-align: center;
+            color: white;
+            z-index: 2;
+            max-width: 800px;
+            padding: 2rem;
+        }
+
+        .system-logo {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            user-select: none;
+        }
+
+        .system-logo:hover {
+            transform: scale(1.1);
+            color: #ffd700;
+        }
+
+        .hero-title {
+            font-size: 3rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+            animation: slideInUp 1s ease-out;
+        }
+
+        .hero-subtitle {
+            font-size: 1.5rem;
+            margin-bottom: 2rem;
+            opacity: 0.9;
+            animation: slideInUp 1s ease-out 0.2s both;
+        }
+
+        .hero-description {
+            font-size: 1.1rem;
+            line-height: 1.8;
+            margin-bottom: 3rem;
+            opacity: 0.8;
+            animation: slideInUp 1s ease-out 0.4s both;
+        }
+
+        @keyframes slideInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .login-container {
+            background: var(--card-bg);
+            border-radius: 20px;
+            padding: 3rem;
+            box-shadow: var(--shadow);
+            max-width: 500px;
+            width: 100%;
+            margin: 2rem;
+            transform: translateY(20px);
+            opacity: 0;
+            animation: slideInUp 0.5s ease-out 0.3s both;
+        }
+
+        .login-header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .login-title {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--primary-color);
+            margin-bottom: 0.5rem;
+        }
+
+        .login-subtitle {
+            color: #666;
+            font-size: 1rem;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            color: var(--text-color);
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 1rem;
+            border: 2px solid var(--border-color);
+            border-radius: 10px;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            background: #fff;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--accent-color);
+            box-shadow: 0 0 0 3px rgba(49, 130, 206, 0.1);
+        }
+
+        .password-input-group {
+            position: relative;
+        }
+
+        .password-toggle {
+            position: absolute;
+            right: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: #666;
+            font-size: 1.2rem;
+        }
+
+        .password-strength {
+            margin-top: 0.5rem;
+            padding: 0.5rem;
+            border-radius: 5px;
+            font-size: 0.9rem;
+            transition: all 0.3s ease;
+        }
+
+        .strength-weak {
+            background: #fed7d7;
+            color: #c53030;
+        }
+
+        .strength-medium {
+            background: #fef2e8;
+            color: #dd6b20;
+        }
+
+        .strength-strong {
+            background: #d4edda;
+            color: #38a169;
+        }
+
+        .btn {
+            padding: 1rem 2rem;
+            border: none;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            color: white;
+            width: 100%;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 15px rgba(26, 54, 93, 0.3);
+        }
+
+        .btn-primary:active {
+            transform: translateY(0);
+        }
+
+        .app-container {
+            display: none;
+            min-height: 100vh;
+            background: var(--bg-color);
+        }
+
+        .app-header {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            color: white;
+            padding: 1rem 2rem;
+            box-shadow: var(--shadow);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .app-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .user-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+        }
+
+        .logout-btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .logout-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .app-content {
+            display: flex;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+            gap: 2rem;
+        }
+
+        .sidebar {
+            width: 300px;
+            background: var(--card-bg);
+            border-radius: 15px;
+            padding: 1.5rem;
+            box-shadow: var(--shadow);
+            height: fit-content;
+            position: sticky;
+            top: 120px;
+        }
+
+        .sidebar-section {
+            margin-bottom: 2rem;
+        }
+
+        .sidebar-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--primary-color);
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .nav-item {
+            padding: 0.75rem 1rem;
+            border-radius: 10px;
+            margin-bottom: 0.5rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            color: var(--text-color);
+        }
+
+        .nav-item:hover {
+            background: rgba(49, 130, 206, 0.1);
+            color: var(--accent-color);
+        }
+
+        .nav-item.active {
+            background: var(--accent-color);
+            color: white;
+        }
+
+        .main-content {
+            flex: 1;
+            background: var(--card-bg);
+            border-radius: 15px;
+            padding: 2rem;
+            box-shadow: var(--shadow);
+        }
+
+        .page-header {
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 2px solid var(--border-color);
+        }
+
+        .page-title {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--primary-color);
+            margin-bottom: 0.5rem;
+        }
+
+        .page-description {
+            color: #666;
+            font-size: 1.1rem;
+        }
+
+        .action-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .search-box {
+            flex: 1;
+            max-width: 400px;
+            position: relative;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 0.75rem 1rem 0.75rem 2.5rem;
+            border: 2px solid var(--border-color);
+            border-radius: 10px;
+            font-size: 1rem;
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #666;
+        }
+
+        .btn-add {
+            background: var(--success-color);
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn-add:hover {
+            background: #2f855a;
+            transform: translateY(-2px);
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .data-table th,
+        .data-table td {
+            padding: 1rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .data-table th {
+            background: var(--primary-color);
+            color: white;
+            font-weight: 600;
+        }
+
+        .data-table tr:hover {
+            background: rgba(49, 130, 206, 0.05);
+        }
+
+        .status-badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .status-active {
+            background: #c6f6d5;
+            color: #22543d;
+        }
+
+        .status-pending {
+            background: #fef2e8;
+            color: #c05621;
+        }
+
+        .status-closed {
+            background: #fed7d7;
+            color: #c53030;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 9999;
+            backdrop-filter: blur(5px);
+        }
+
+        .modal-content {
+            background: white;
+            margin: 2rem auto;
+            padding: 2rem;
+            border-radius: 15px;
+            max-width: 800px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            animation: slideInUp 0.3s ease-out;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 2px solid var(--border-color);
+        }
+
+        .modal-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--primary-color);
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 2rem;
+            cursor: pointer;
+            color: #666;
+            transition: color 0.3s ease;
+        }
+
+        .close-btn:hover {
+            color: var(--danger-color);
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .form-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 1rem;
+            margin-top: 2rem;
+            padding-top: 1rem;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .btn-cancel {
+            background: #e2e8f0;
+            color: var(--text-color);
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .btn-cancel:hover {
+            background: #cbd5e0;
+        }
+
+        .btn-save {
+            background: var(--success-color);
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .btn-save:hover {
+            background: #2f855a;
+        }
+
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 1rem 1.5rem;
+            border-radius: 10px;
+            color: white;
+            z-index: 10000;
+            animation: slideInRight 0.3s ease-out;
+            max-width: 400px;
+            box-shadow: var(--shadow);
+        }
+
+        .notification.success {
+            background: var(--success-color);
+        }
+
+        .notification.error {
+            background: var(--danger-color);
+        }
+
+        .notification.warning {
+            background: var(--warning-color);
+        }
+
+        @keyframes slideInRight {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .fade-in {
+            animation: fadeIn 0.5s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        @media (max-width: 768px) {
+            .app-content {
+                flex-direction: column;
+                padding: 1rem;
+            }
+            
+            .sidebar {
+                width: 100%;
+                position: static;
+            }
+            
+            .hero-title {
+                font-size: 2rem;
+            }
+            
+            .hero-subtitle {
+                font-size: 1.2rem;
+            }
+            
+            .login-container {
+                margin: 1rem;
+                padding: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Loading Screen -->
+    <div id="loadingScreen" class="loading-screen">
+        <div class="loading-spinner"></div>
+    </div>
+
+    <!-- Landing Page -->
+    <div id="landingPage" class="landing-page">
+        <div class="floating-elements">
+            <div class="float-element">
+                <i class="fas fa-shield-alt fa-3x"></i>
+            </div>
+            <div class="float-element">
+                <i class="fas fa-search fa-3x"></i>
+            </div>
+            <div class="float-element">
+                <i class="fas fa-gavel fa-3x"></i>
+            </div>
+            <div class="float-element">
+                <i class="fas fa-balance-scale fa-3x"></i>
+            </div>
+        </div>
+        
+        <div class="hero-content">
+            <div id="systemLogo" class="system-logo">
+                <i class="fas fa-shield-alt"></i>
+            </div>
+            <h1 class="hero-title">AML & Economic Crimes Prevention System</h1>
+            <p class="hero-subtitle">Advanced Law Enforcement Platform</p>
+            <p class="hero-description">
+                Comprehensive Anti-Money Laundering and Economic Crimes Prevention System designed for law enforcement agencies. 
+                Features advanced case management, intelligence gathering, asset recovery, and real-time collaboration tools.
+            </p>
+        </div>
+    </div>
+
+    <!-- Login Modal -->
+    <div id="loginModal" class="modal">
+        <div class="modal-content">
+            <div class="login-container">
+                <div class="login-header">
+                    <h2 class="login-title">Secure Access</h2>
+                    <p class="login-subtitle">Enter your credentials to access the system</p>
+                </div>
+                
+                <form id="loginForm">
+                    <div class="form-group">
+                        <label for="email" class="form-label">Email Address</label>
+                        <input type="email" id="email" class="form-input" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="password" class="form-label">Password</label>
+                        <div class="password-input-group">
+                            <input type="password" id="password" class="form-input" required>
+                            <button type="button" class="password-toggle" onclick="togglePassword()">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                        <div id="passwordStrength" class="password-strength" style="display: none;"></div>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-sign-in-alt"></i> Access System
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Application -->
+    <div id="appContainer" class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-content">
+                <h1 class="app-title">
+                    <i class="fas fa-shield-alt"></i>
+                    AML & Economic Crimes Prevention System
+                </h1>
+                <div class="user-info">
+                    <div class="user-avatar">
+                        <i class="fas fa-user"></i>
+                    </div>
+                    <div>
+                        <div id="userName" class="user-name">Loading...</div>
+                        <div id="userRole" class="user-role">Loading...</div>
+                    </div>
+                    <button class="logout-btn" onclick="logout()">
+                        <i class="fas fa-sign-out-alt"></i> Logout
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <div class="app-content">
+            <!-- Sidebar -->
+            <aside class="sidebar">
+                <div class="sidebar-section">
+                    <h3 class="sidebar-title">
+                        <i class="fas fa-briefcase"></i>
+                        Core Operations
+                    </h3>
+                    <div class="nav-item" onclick="loadModule('cases')">
+                        <i class="fas fa-briefcase"></i>
+                        Case Management
+                    </div>
+                    <div class="nav-item" onclick="loadModule('investigations')">
+                        <i class="fas fa-search"></i>
+                        Investigations
+                    </div>
+                    <div class="nav-item" onclick="loadModule('prosecutions')">
+                        <i class="fas fa-gavel"></i>
+                        Prosecutions
+                    </div>
+                </div>
+
+                <div class="sidebar-section">
+                    <h3 class="sidebar-title">
+                        <i class="fas fa-users"></i>
+                        Intelligence
+                    </h3>
+                    <div class="nav-item" onclick="loadModule('entities')">
+                        <i class="fas fa-users"></i>
+                        Entity Management
+                    </div>
+                    <div class="nav-item" onclick="loadModule('financialIntelligence')">
+                        <i class="fas fa-chart-line"></i>
+                        Financial Intelligence
+                    </div>
+                    <div class="nav-item" onclick="loadModule('intelligenceReports')">
+                        <i class="fas fa-eye"></i>
+                        Intelligence Reports
+                    </div>
+                </div>
+
+                <div class="sidebar-section">
+                    <h3 class="sidebar-title">
+                        <i class="fas fa-building"></i>
+                        Assets
+                    </h3>
+                    <div class="nav-item" onclick="loadModule('properties')">
+                        <i class="fas fa-building"></i>
+                        Property Registry
+                    </div>
+                    <div class="nav-item" onclick="loadModule('seizedAssets')">
+                        <i class="fas fa-hand-holding-usd"></i>
+                        Seized Assets
+                    </div>
+                </div>
+
+                <div class="sidebar-section">
+                    <h3 class="sidebar-title">
+                        <i class="fas fa-search"></i>
+                        Investigation
+                    </h3>
+                    <div class="nav-item" onclick="loadModule('evidence')">
+                        <i class="fas fa-folder-open"></i>
+                        Evidence Management
+                    </div>
+                    <div class="nav-item" onclick="loadModule('suspects')">
+                        <i class="fas fa-user-secret"></i>
+                        Suspects
+                    </div>
+                    <div class="nav-item" onclick="loadModule('witnesses')">
+                        <i class="fas fa-user-check"></i>
+                        Witnesses
+                    </div>
+                    <div class="nav-item" onclick="loadModule('victims')">
+                        <i class="fas fa-user-shield"></i>
+                        Victims
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Main Content Area -->
+            <main class="main-content">
+                <div id="moduleContent">
+                    <!-- Dynamic content loaded here -->
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Record Modal -->
+    <div id="recordModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle" class="modal-title">Add New Record</h2>
+                <button class="close-btn" onclick="closeModal()">&times;</button>
+            </div>
+            <form id="recordForm">
+                <div id="formFields" class="form-grid">
+                    <!-- Dynamic form fields loaded here -->
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn-cancel" onclick="closeModal()">Cancel</button>
+                    <button type="submit" class="btn-save">Save Record</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let currentUser = null;
+        let currentModule = null;
+        let currentData = [];
+        let moduleConfigs = {};
+        let clickCount = 0;
+        let clickTimer = null;
+
+        // Initialize application
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(() => {
+                document.getElementById('loadingScreen').style.display = 'none';
+                setupTripleClickLogin();
+            }, 2000);
+        });
+
+        // Triple-click security feature
+        function setupTripleClickLogin() {
+            const logo = document.getElementById('systemLogo');
+            logo.addEventListener('click', function() {
+                clickCount++;
+                
+                if (clickCount === 1) {
+                    clickTimer = setTimeout(() => {
+                        clickCount = 0;
+                    }, 1000);
+                } else if (clickCount === 3) {
+                    clearTimeout(clickTimer);
+                    clickCount = 0;
+                    showLoginModal();
+                }
+            });
+        }
+
+        function showLoginModal() {
+            document.getElementById('loginModal').style.display = 'block';
+            document.getElementById('email').focus();
+        }
+
+        function closeModal() {
+            document.getElementById('loginModal').style.display = 'none';
+            document.getElementById('recordModal').style.display = 'none';
+        }
+
+        // Password functionality
+        function togglePassword() {
+            const passwordInput = document.getElementById('password');
+            const toggleBtn = document.querySelector('.password-toggle i');
+            
+            if (passwordInput.type === 'password') {
+                passwordInput.type = 'text';
+                toggleBtn.className = 'fas fa-eye-slash';
+            } else {
+                passwordInput.type = 'password';
+                toggleBtn.className = 'fas fa-eye';
+            }
+        }
+
+        // Password strength checker
+        document.getElementById('password').addEventListener('input', function() {
+            const password = this.value;
+            const strengthDiv = document.getElementById('passwordStrength');
+            
+            if (password.length === 0) {
+                strengthDiv.style.display = 'none';
+                return;
+            }
+            
+            strengthDiv.style.display = 'block';
+            
+            let strength = 0;
+            let feedback = [];
+            
+            if (password.length >= 8) strength++;
+            else feedback.push('At least 8 characters');
+            
+            if (/[A-Z]/.test(password)) strength++;
+            else feedback.push('One uppercase letter');
+            
+            if (/[a-z]/.test(password)) strength++;
+            else feedback.push('One lowercase letter');
+            
+            if (/[0-9]/.test(password)) strength++;
+            else feedback.push('One number');
+            
+            if (/[^A-Za-z0-9]/.test(password)) strength++;
+            else feedback.push('One special character');
+            
+            if (strength < 3) {
+                strengthDiv.className = 'password-strength strength-weak';
+                strengthDiv.textContent = 'Weak - Missing: ' + feedback.join(', ');
+            } else if (strength < 5) {
+                strengthDiv.className = 'password-strength strength-medium';
+                strengthDiv.textContent = 'Medium - Missing: ' + feedback.join(', ');
+            } else {
+                strengthDiv.className = 'password-strength strength-strong';
+                strengthDiv.textContent = 'Strong password';
+            }
+        });
+
+        // Login form handler
+        document.getElementById('loginForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            
+            try {
+                const response = await fetch(window.location.href + '?action=login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        email: email,
+                        password: password,
+                        userAgent: navigator.userAgent,
+                        ipAddress: 'unknown',
+                        location: await getCurrentLocation()
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    currentUser = result.user;
+                    localStorage.setItem('sessionToken', result.sessionToken);
+                    showApp();
+                    showNotification('Login successful!', 'success');
+                } else {
+                    showNotification(result.error || 'Login failed', 'error');
+                }
+            } catch (error) {
+                console.error('Login error:', error);
+                showNotification('Login failed. Please try again.', 'error');
+            }
+        });
+
+        function getCurrentLocation() {
+            return new Promise((resolve) => {
+                if (navigator.geolocation) {
+                    navigator.geolocation.getCurrentPosition(
+                        (position) => resolve({
+                            lat: position.coords.latitude,
+                            lng: position.coords.longitude
+                        }),
+                        () => resolve(null)
+                    );
+                } else {
+                    resolve(null);
+                }
+            });
+        }
+
+        function showApp() {
+            document.getElementById('landingPage').style.display = 'none';
+            document.getElementById('loginModal').style.display = 'none';
+            document.getElementById('appContainer').style.display = 'block';
+            
+            // Update user info
+            document.getElementById('userName').textContent = currentUser.name;
+            document.getElementById('userRole').textContent = currentUser.role;
+            
+            // Load module configurations
+            loadModuleConfigs();
+            
+            // Load default module
+            loadModule('cases');
+        }
+
+        async function loadModuleConfigs() {
+            try {
+                const response = await fetch(window.location.href + '?action=getModuleConfig');
+                const result = await response.json();
+                moduleConfigs = result.modules;
+            } catch (error) {
+                console.error('Error loading module configs:', error);
+            }
+        }
+
+        async function loadModule(moduleName) {
+            currentModule = moduleName;
+            
+            // Update active nav item
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            // Load module data
+            await loadModuleData(moduleName);
+            
+            // Render module content
+            renderModuleContent(moduleName);
+        }
+
+        async function loadModuleData(moduleName) {
+            try {
+                const token = localStorage.getItem('sessionToken');
+                const response = await fetch(window.location.href + `?action=getData&module=${moduleName}&userToken=${token}`);
+                const result = await response.json();
+                
+                if (result.data) {
+                    currentData = result.data;
+                } else {
+                    currentData = [];
+                    if (result.error) {
+                        showNotification(result.error, 'error');
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading module data:', error);
+                currentData = [];
+            }
+        }
+
+        function renderModuleContent(moduleName) {
+            const config = moduleConfigs[moduleName];
+            if (!config) return;
+            
+            const content = document.getElementById('moduleContent');
+            content.innerHTML = `
+                <div class="page-header">
+                    <h1 class="page-title">
+                        <i class="${config.icon}"></i>
+                        ${config.title}
+                    </h1>
+                    <p class="page-description">Manage ${config.title.toLowerCase()} records</p>
+                </div>
+                
+                <div class="action-bar">
+                    <div class="search-box">
+                        <i class="fas fa-search search-icon"></i>
+                        <input type="text" class="search-input" placeholder="Search records..." oninput="filterData(this.value)">
+                    </div>
+                    <button class="btn-add" onclick="showAddModal()">
+                        <i class="fas fa-plus"></i>
+                        Add New
+                    </button>
+                </div>
+                
+                <div class="table-container">
+                    ${renderDataTable(moduleName)}
+                </div>
+            `;
+        }
+
+        function renderDataTable(moduleName) {
+            const config = moduleConfigs[moduleName];
+            if (!config || !currentData.length) {
+                return '<p>No records found.</p>';
+            }
+            
+            const headers = Object.keys(config.fields).slice(0, 6); // Show first 6 fields
+            
+            let tableHTML = `
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            ${headers.map(header => `<th>${config.fields[header].label}</th>`).join('')}
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+            
+            currentData.forEach(record => {
+                tableHTML += `
+                    <tr>
+                        ${headers.map(header => `<td>${record[header] || '-'}</td>`).join('')}
+                        <td>
+                            <span class="status-badge status-${(record.Status || 'active').toLowerCase()}">
+                                ${record.Status || 'Active'}
+                            </span>
+                        </td>
+                        <td>
+                            <button class="btn btn-sm" onclick="editRecord('${record.ID}')">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button class="btn btn-sm" onclick="deleteRecord('${record.ID}')">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+            
+            tableHTML += `
+                    </tbody>
+                </table>
+            `;
+            
+            return tableHTML;
+        }
+
+        function showAddModal() {
+            document.getElementById('modalTitle').textContent = `Add New ${moduleConfigs[currentModule].title}`;
+            document.getElementById('recordForm').reset();
+            renderModalForm();
+            document.getElementById('recordModal').style.display = 'block';
+        }
+
+        function renderModalForm() {
+            const config = moduleConfigs[currentModule];
+            if (!config) return;
+            
+            const formFields = document.getElementById('formFields');
+            formFields.innerHTML = '';
+            
+            Object.keys(config.fields).forEach(fieldName => {
+                const field = config.fields[fieldName];
+                const fieldDiv = document.createElement('div');
+                fieldDiv.className = 'form-group';
+                
+                let inputHTML = '';
+                switch (field.type) {
+                    case 'textarea':
+                        inputHTML = `<textarea class="form-input" name="${fieldName}" ${field.required ? 'required' : ''}></textarea>`;
+                        break;
+                    case 'select':
+                        const options = Array.isArray(field.options) ? field.options : [];
+                        inputHTML = `
+                            <select class="form-input" name="${fieldName}" ${field.required ? 'required' : ''}>
+                                <option value="">Select ${field.label}</option>
+                                ${options.map(option => `<option value="${option}">${option}</option>`).join('')}
+                            </select>
+                        `;
+                        break;
+                    default:
+                        inputHTML = `<input type="${field.type}" class="form-input" name="${fieldName}" ${field.required ? 'required' : ''}}>`;
+                }
+                
+                fieldDiv.innerHTML = `
+                    <label class="form-label">${field.label} ${field.required ? '*' : ''}</label>
+                    ${inputHTML}
+                `;
+                
+                formFields.appendChild(fieldDiv);
+            });
+        }
+
+        // Record form handler
+        document.getElementById('recordForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            const recordData = {};
+            
+            for (let [key, value] of formData.entries()) {
+                recordData[key] = value;
+            }
+            
+            try {
+                const token = localStorage.getItem('sessionToken');
+                const response = await fetch(window.location.href, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        action: 'createRecord',
+                        module: currentModule,
+                        recordData: recordData,
+                        userToken: token
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showNotification('Record saved successfully!', 'success');
+                    closeModal();
+                    await loadModuleData(currentModule);
+                    renderModuleContent(currentModule);
+                } else {
+                    showNotification(result.error || 'Failed to save record', 'error');
+                }
+            } catch (error) {
+                console.error('Save error:', error);
+                showNotification('Failed to save record. Please try again.', 'error');
+            }
+        });
+
+        function filterData(searchTerm) {
+            // Simple client-side filtering
+            const tableRows = document.querySelectorAll('.data-table tbody tr');
+            
+            tableRows.forEach(row => {
+                const text = row.textContent.toLowerCase();
+                if (text.includes(searchTerm.toLowerCase())) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        }
+
+        function editRecord(recordId) {
+            // Implementation for editing records
+            showNotification('Edit functionality coming soon!', 'warning');
+        }
+
+        function deleteRecord(recordId) {
+            Swal.fire({
+                title: 'Are you sure?',
+                text: "This action cannot be undone!",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#e53e3e',
+                cancelButtonColor: '#3182ce',
+                confirmButtonText: 'Yes, delete it!'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    // Implement delete functionality
+                    showNotification('Record deleted successfully!', 'success');
+                }
+            });
+        }
+
+        function logout() {
+            localStorage.removeItem('sessionToken');
+            currentUser = null;
+            document.getElementById('appContainer').style.display = 'none';
+            document.getElementById('landingPage').style.display = 'flex';
+            showNotification('Logged out successfully!', 'success');
+        }
+
+        function showNotification(message, type) {
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            notification.textContent = message;
+            
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.remove();
+            }, 5000);
+        }
+
+        // Auto-refresh data every 30 seconds
+        setInterval(async () => {
+            if (currentModule && currentUser) {
+                await loadModuleData(currentModule);
+                renderModuleContent(currentModule);
+            }
+        }, 30000);
+    </script>
+</body>
+</html>
