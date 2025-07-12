@@ -111,9 +111,9 @@
         .system-logo {
             font-size: 4rem;
             margin-bottom: 1rem;
-            cursor: pointer;
             transition: all 0.3s ease;
             user-select: none;
+            /* Removed cursor: pointer to maintain security */
         }
 
         .system-logo:hover {
@@ -276,6 +276,21 @@
 
         .btn-primary:active {
             transform: translateY(0);
+        }
+
+        .forgot-password-link {
+            display: block;
+            text-align: center;
+            margin-top: 1rem;
+            color: var(--accent-color);
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: color 0.3s ease;
+        }
+
+        .forgot-password-link:hover {
+            color: var(--primary-color);
+            text-decoration: underline;
         }
 
         .app-container {
@@ -767,6 +782,73 @@
                     <button type="submit" class="btn btn-primary">
                         <i class="fas fa-sign-in-alt"></i> Access System
                     </button>
+                    
+                    <a href="#" class="forgot-password-link" onclick="showForgotPasswordModal(event)">
+                        Forgot Password?
+                    </a>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Forgot Password Modal -->
+    <div id="forgotPasswordModal" class="modal">
+        <div class="modal-content">
+            <div class="login-container">
+                <div class="login-header">
+                    <h2 class="login-title">Reset Password</h2>
+                    <p class="login-subtitle">Enter your email address to receive a password reset link</p>
+                </div>
+                
+                <form id="forgotPasswordForm">
+                    <div class="form-group">
+                        <label for="forgotEmail" class="form-label">Email Address</label>
+                        <input type="email" id="forgotEmail" class="form-input" required>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-paper-plane"></i> Send Reset Link
+                    </button>
+                    
+                    <a href="#" class="forgot-password-link" onclick="showLoginModal(event)">
+                        Back to Login
+                    </a>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reset Password Modal -->
+    <div id="resetPasswordModal" class="modal">
+        <div class="modal-content">
+            <div class="login-container">
+                <div class="login-header">
+                    <h2 class="login-title">Set New Password</h2>
+                    <p class="login-subtitle">Enter your new password</p>
+                </div>
+                
+                <form id="resetPasswordForm">
+                    <input type="hidden" id="resetToken" value="">
+                    
+                    <div class="form-group">
+                        <label for="newPassword" class="form-label">New Password</label>
+                        <div class="password-input-group">
+                            <input type="password" id="newPassword" class="form-input" required>
+                            <button type="button" class="password-toggle" onclick="toggleNewPassword()">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                        <div id="newPasswordStrength" class="password-strength" style="display: none;"></div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="confirmNewPassword" class="form-label">Confirm New Password</label>
+                        <input type="password" id="confirmNewPassword" class="form-input" required>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-key"></i> Reset Password
+                    </button>
                 </form>
             </div>
         </div>
@@ -919,8 +1001,19 @@
             setTimeout(() => {
                 document.getElementById('loadingScreen').style.display = 'none';
                 setupTripleClickLogin();
+                checkResetToken();
             }, 2000);
         });
+
+        // Check for reset token in URL
+        function checkResetToken() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const resetToken = urlParams.get('resetToken');
+            if (resetToken) {
+                document.getElementById('resetToken').value = resetToken;
+                showResetPasswordModal();
+            }
+        }
 
         // Triple-click security feature
         function setupTripleClickLogin() {
@@ -940,13 +1033,34 @@
             });
         }
 
-        function showLoginModal() {
+        function showLoginModal(event) {
+            if (event) event.preventDefault();
+            closeAllModals();
             document.getElementById('loginModal').style.display = 'block';
             document.getElementById('email').focus();
         }
 
+        function showForgotPasswordModal(event) {
+            if (event) event.preventDefault();
+            closeAllModals();
+            document.getElementById('forgotPasswordModal').style.display = 'block';
+            document.getElementById('forgotEmail').focus();
+        }
+
+        function showResetPasswordModal() {
+            closeAllModals();
+            document.getElementById('resetPasswordModal').style.display = 'block';
+            document.getElementById('newPassword').focus();
+        }
+
         function closeModal() {
+            closeAllModals();
+        }
+
+        function closeAllModals() {
             document.getElementById('loginModal').style.display = 'none';
+            document.getElementById('forgotPasswordModal').style.display = 'none';
+            document.getElementById('resetPasswordModal').style.display = 'none';
             document.getElementById('recordModal').style.display = 'none';
         }
 
@@ -964,10 +1078,31 @@
             }
         }
 
+        function toggleNewPassword() {
+            const passwordInput = document.getElementById('newPassword');
+            const toggleBtn = passwordInput.parentElement.querySelector('.password-toggle i');
+            
+            if (passwordInput.type === 'password') {
+                passwordInput.type = 'text';
+                toggleBtn.className = 'fas fa-eye-slash';
+            } else {
+                passwordInput.type = 'password';
+                toggleBtn.className = 'fas fa-eye';
+            }
+        }
+
         // Password strength checker
         document.getElementById('password').addEventListener('input', function() {
-            const password = this.value;
-            const strengthDiv = document.getElementById('passwordStrength');
+            checkPasswordStrength(this, 'passwordStrength');
+        });
+
+        document.getElementById('newPassword').addEventListener('input', function() {
+            checkPasswordStrength(this, 'newPasswordStrength');
+        });
+
+        function checkPasswordStrength(input, strengthDivId) {
+            const password = input.value;
+            const strengthDiv = document.getElementById(strengthDivId);
             
             if (password.length === 0) {
                 strengthDiv.style.display = 'none';
@@ -1004,7 +1139,7 @@
                 strengthDiv.className = 'password-strength strength-strong';
                 strengthDiv.textContent = 'Strong password';
             }
-        });
+        }
 
         // Login form handler
         document.getElementById('loginForm').addEventListener('submit', async function(e) {
@@ -1044,6 +1179,81 @@
             }
         });
 
+        // Forgot password form handler
+        document.getElementById('forgotPasswordForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const email = document.getElementById('forgotEmail').value;
+            
+            try {
+                const response = await fetch(window.location.href, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        action: 'forgotPassword',
+                        email: email
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showNotification(result.message, 'success');
+                    closeModal();
+                } else {
+                    showNotification(result.error || 'Password reset request failed', 'error');
+                }
+            } catch (error) {
+                console.error('Forgot password error:', error);
+                showNotification('Password reset request failed. Please try again.', 'error');
+            }
+        });
+
+        // Reset password form handler
+        document.getElementById('resetPasswordForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const resetToken = document.getElementById('resetToken').value;
+            const newPassword = document.getElementById('newPassword').value;
+            const confirmNewPassword = document.getElementById('confirmNewPassword').value;
+            
+            if (newPassword !== confirmNewPassword) {
+                showNotification('Passwords do not match', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch(window.location.href, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        action: 'resetPassword',
+                        resetToken: resetToken,
+                        newPassword: newPassword,
+                        confirmPassword: confirmNewPassword
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showNotification(result.message, 'success');
+                    closeModal();
+                    // Clear URL parameters
+                    window.history.replaceState({}, document.title, window.location.pathname);
+                } else {
+                    showNotification(result.error || 'Password reset failed', 'error');
+                }
+            } catch (error) {
+                console.error('Reset password error:', error);
+                showNotification('Password reset failed. Please try again.', 'error');
+            }
+        });
+
         function getCurrentLocation() {
             return new Promise((resolve) => {
                 if (navigator.geolocation) {
@@ -1062,7 +1272,7 @@
 
         function showApp() {
             document.getElementById('landingPage').style.display = 'none';
-            document.getElementById('loginModal').style.display = 'none';
+            closeAllModals();
             document.getElementById('appContainer').style.display = 'block';
             
             // Update user info

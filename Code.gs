@@ -37,7 +37,8 @@ const CONFIG = {
     EVIDENCE: 'Evidence',
     SUSPECTS: 'Suspects',
     WITNESSES: 'Witnesses',
-    VICTIMS: 'Victims'
+    VICTIMS: 'Victims',
+    ACTIVITY_LOG: 'ActivityLog'
   },
   
   USER_ROLES: {
@@ -456,6 +457,10 @@ function doPost(e) {
         return handleRegister(data);
       case 'changePassword':
         return handleChangePassword(data);
+      case 'forgotPassword':
+        return handleForgotPassword(data);
+      case 'resetPassword':
+        return handleResetPassword(data);
       case 'logSecurityEvent':
         return handleLogSecurityEvent(data);
       default:
@@ -526,6 +531,123 @@ function handleLogin(params) {
   }
 }
 
+function handleForgotPassword(data) {
+  try {
+    const { email } = data;
+    
+    if (!email) {
+      return createJsonResponse({ error: 'Email is required' }, 400);
+    }
+    
+    // Check if user exists
+    const user = getUserByEmail(email);
+    if (!user) {
+      // Don't reveal whether user exists or not for security
+      return createJsonResponse({ 
+        success: true, 
+        message: 'If the email exists in our system, a reset link will be sent.' 
+      });
+    }
+    
+    // Generate reset token
+    const resetToken = Utilities.getUuid();
+    const expiryTime = new Date(Date.now() + (30 * 60 * 1000)); // 30 minutes
+    
+    // Store reset token
+    PropertiesService.getScriptProperties().setProperty(
+      'reset_' + resetToken,
+      JSON.stringify({
+        email: email,
+        expiryTime: expiryTime.toISOString(),
+        createdAt: new Date().toISOString()
+      })
+    );
+    
+    // Send reset email
+    sendPasswordResetEmail(email, resetToken);
+    
+    // Log activity
+    logSecurityEvent('PASSWORD_RESET_REQUESTED', email, 'Password reset requested');
+    
+    return createJsonResponse({
+      success: true,
+      message: 'If the email exists in our system, a reset link will be sent.'
+    });
+    
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    return createJsonResponse({ error: 'Password reset request failed' }, 500);
+  }
+}
+
+function handleResetPassword(data) {
+  try {
+    const { resetToken, newPassword, confirmPassword } = data;
+    
+    if (!resetToken || !newPassword || !confirmPassword) {
+      return createJsonResponse({ error: 'All fields are required' }, 400);
+    }
+    
+    if (newPassword !== confirmPassword) {
+      return createJsonResponse({ error: 'Passwords do not match' }, 400);
+    }
+    
+    if (!validatePasswordStrength(newPassword)) {
+      return createJsonResponse({ error: 'Password does not meet requirements' }, 400);
+    }
+    
+    // Validate reset token
+    const tokenData = PropertiesService.getScriptProperties().getProperty('reset_' + resetToken);
+    if (!tokenData) {
+      return createJsonResponse({ error: 'Invalid or expired reset token' }, 400);
+    }
+    
+    const token = JSON.parse(tokenData);
+    const expiryTime = new Date(token.expiryTime);
+    
+    if (new Date() > expiryTime) {
+      PropertiesService.getScriptProperties().deleteProperty('reset_' + resetToken);
+      return createJsonResponse({ error: 'Reset token has expired' }, 400);
+    }
+    
+    // Update user password
+    const user = getUserByEmail(token.email);
+    if (!user) {
+      return createJsonResponse({ error: 'User not found' }, 404);
+    }
+    
+    // Update password in Users sheet
+    const sheet = getSheet(CONFIG.SHEETS.USERS);
+    const data_range = sheet.getDataRange();
+    const values = data_range.getValues();
+    
+    for (let i = 1; i < values.length; i++) {
+      if (values[i][2] === token.email) { // Email column
+        const hashedPassword = hashPassword(newPassword);
+        sheet.getRange(i + 1, 5).setValue(hashedPassword); // Password column
+        sheet.getRange(i + 1, 10).setValue(0); // Reset login attempts
+        sheet.getRange(i + 1, 7).setValue(false); // Unlock account
+        break;
+      }
+    }
+    
+    // Delete reset token
+    PropertiesService.getScriptProperties().deleteProperty('reset_' + resetToken);
+    
+    // Log activity
+    logSecurityEvent('PASSWORD_RESET_COMPLETED', token.email, 'Password successfully reset');
+    
+    return createJsonResponse({
+      success: true,
+      message: 'Password reset successfully'
+    });
+    
+  } catch (error) {
+    console.error('Reset password error:', error);
+    return createJsonResponse({ error: 'Password reset failed' }, 500);
+  }
+}
+
 function performSecurityValidation(params) {
   const { userAgent, ipAddress, location } = params;
   
@@ -586,22 +708,182 @@ function getSheet(sheetName) {
 }
 
 function initializeSheet(sheet, sheetName) {
-  // Initialize sheet with appropriate headers based on module configuration
-  const moduleKey = Object.keys(MODULE_CONFIG).find(key => MODULE_CONFIG[key].sheetName === sheetName);
-  
-  if (moduleKey) {
-    const config = MODULE_CONFIG[moduleKey];
-    const headers = ['ID', 'Created', 'CreatedBy', 'Modified', 'ModifiedBy', 'Status', 'ApprovalStatus'];
+  try {
+    console.log(`Initializing sheet: ${sheetName}`);
     
-    // Add module-specific headers
-    Object.keys(config.fields).forEach(fieldName => {
-      headers.push(fieldName);
-    });
+    // Initialize different types of sheets
+    if (sheetName === CONFIG.SHEETS.USERS) {
+      initializeUsersSheet(sheet);
+    } else if (sheetName === CONFIG.SHEETS.SECURITY_LOGS) {
+      initializeSecurityLogsSheet(sheet);
+    } else if (sheetName === CONFIG.SHEETS.INVITATIONS) {
+      initializeInvitationsSheet(sheet);
+    } else if (sheetName === CONFIG.SHEETS.ACTIVITY_LOG) {
+      initializeActivityLogSheet(sheet);
+    } else {
+      // Initialize module sheets
+      const moduleKey = Object.keys(MODULE_CONFIG).find(key => MODULE_CONFIG[key].sheetName === sheetName);
+      if (moduleKey) {
+        initializeModuleSheet(sheet, moduleKey);
+      }
+    }
     
-    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
-    sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold');
-    sheet.setFrozenRows(1);
+    console.log(`Sheet ${sheetName} initialized successfully`);
+  } catch (error) {
+    console.error(`Error initializing sheet ${sheetName}:`, error);
   }
+}
+
+function initializeUsersSheet(sheet) {
+  const headers = [
+    'ID', 'Name', 'Email', 'Role', 'HashedPassword', 'IsActive', 'IsLocked',
+    'Created', 'LastLogin', 'LoginAttempts', 'AccountExpiry', 'InvitationCode',
+    'Phone', 'Department', 'Position', 'BadgeNumber', 'SecurityClearance',
+    'TwoFactorEnabled', 'PreferredLanguage', 'Timezone', 'LastPasswordChange',
+    'PasswordResetRequired', 'ProfilePicture', 'EmergencyContact', 'Notes'
+  ];
+  
+  sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold');
+  sheet.getRange(1, 1, 1, headers.length).setBackground('#1a365d');
+  sheet.getRange(1, 1, 1, headers.length).setFontColor('#ffffff');
+  sheet.setFrozenRows(1);
+  
+  // Auto-resize columns
+  sheet.autoResizeColumns(1, headers.length);
+}
+
+function initializeSecurityLogsSheet(sheet) {
+  const headers = [
+    'ID', 'Timestamp', 'EventType', 'UserEmail', 'Details', 'SourceIP',
+    'UserAgent', 'Location', 'Severity', 'Status', 'ResponseAction'
+  ];
+  
+  sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold');
+  sheet.getRange(1, 1, 1, headers.length).setBackground('#e53e3e');
+  sheet.getRange(1, 1, 1, headers.length).setFontColor('#ffffff');
+  sheet.setFrozenRows(1);
+  
+  sheet.autoResizeColumns(1, headers.length);
+}
+
+function initializeInvitationsSheet(sheet) {
+  const headers = [
+    'ID', 'InvitationCode', 'Email', 'Role', 'CreatedDate', 'ExpiryDate',
+    'CreatedBy', 'Status', 'IsUsed', 'UsedDate', 'Notes'
+  ];
+  
+  sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold');
+  sheet.getRange(1, 1, 1, headers.length).setBackground('#3182ce');
+  sheet.getRange(1, 1, 1, headers.length).setFontColor('#ffffff');
+  sheet.setFrozenRows(1);
+  
+  sheet.autoResizeColumns(1, headers.length);
+}
+
+function initializeActivityLogSheet(sheet) {
+  const headers = [
+    'ID', 'Timestamp', 'Action', 'Module', 'RecordID', 'UserEmail',
+    'Details', 'IPAddress', 'UserAgent', 'SessionID'
+  ];
+  
+  sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold');
+  sheet.getRange(1, 1, 1, headers.length).setBackground('#38a169');
+  sheet.getRange(1, 1, 1, headers.length).setFontColor('#ffffff');
+  sheet.setFrozenRows(1);
+  
+  sheet.autoResizeColumns(1, headers.length);
+}
+
+function initializeModuleSheet(sheet, moduleKey) {
+  const config = MODULE_CONFIG[moduleKey];
+  const headers = ['ID', 'Created', 'CreatedBy', 'Modified', 'ModifiedBy', 'Status', 'ApprovalStatus'];
+  
+  // Add module-specific headers
+  Object.keys(config.fields).forEach(fieldName => {
+    headers.push(fieldName);
+  });
+  
+  sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold');
+  sheet.getRange(1, 1, 1, headers.length).setBackground('#2d5a87');
+  sheet.getRange(1, 1, 1, headers.length).setFontColor('#ffffff');
+  sheet.setFrozenRows(1);
+  
+  sheet.autoResizeColumns(1, headers.length);
+  
+  // Add sample data for demonstration
+  addSampleDataToModule(sheet, moduleKey, headers);
+}
+
+function addSampleDataToModule(sheet, moduleKey, headers) {
+  try {
+    const sampleData = getSampleDataForModule(moduleKey);
+    if (sampleData.length > 0) {
+      const startRow = 2;
+      sheet.getRange(startRow, 1, sampleData.length, headers.length).setValues(sampleData);
+      
+      // Format sample data rows
+      sheet.getRange(startRow, 1, sampleData.length, headers.length).setBackground('#f7fafc');
+    }
+  } catch (error) {
+    console.error(`Error adding sample data to ${moduleKey}:`, error);
+  }
+}
+
+function getSampleDataForModule(moduleKey) {
+  const now = new Date();
+  const sampleData = [];
+  
+  switch (moduleKey) {
+    case 'cases':
+      sampleData.push([
+        'CAS001', now, 'system@example.com', now, 'system@example.com', 'Active', 'Approved',
+        'ML-2024-001', 'Suspicious Banking Transactions', 'Money Laundering', 'High', 'Open',
+        'admin@deczambia.gov.zm', now, 250000, 'Lusaka', 'Investigation into suspicious banking transactions involving multiple accounts', 'High', 8
+      ]);
+      sampleData.push([
+        'CAS002', now, 'system@example.com', now, 'system@example.com', 'Active', 'Approved',
+        'TF-2024-001', 'Terrorism Financing Investigation', 'Terrorism Financing', 'Critical', 'Under Investigation',
+        'admin@deczambia.gov.zm', now, 150000, 'Ndola', 'Investigation into suspected terrorism financing network', 'High', 9
+      ]);
+      break;
+      
+    case 'entities':
+      sampleData.push([
+        'ENT001', now, 'system@example.com', now, 'system@example.com', 'Active', 'Approved',
+        'ENT-001', 'Individual', 'John Doe', 'Johnny', new Date('1980-01-01'), 'Zambian',
+        'NRC123456789', '123 Main Street, Lusaka', '+260971234567', 'john.doe@example.com', 45, 'Not PEP', 'No', 'Sample individual entity'
+      ]);
+      sampleData.push([
+        'ENT002', now, 'system@example.com', now, 'system@example.com', 'Active', 'Approved',
+        'ENT-002', 'Corporation', 'ABC Trading Ltd', 'ABC Corp', new Date('2010-05-15'), 'Zambian',
+        'REG987654321', '456 Business Ave, Lusaka', '+260211123456', 'info@abctrading.com', 60, 'Not PEP', 'No', 'Sample corporate entity'
+      ]);
+      break;
+      
+    case 'investigations':
+      sampleData.push([
+        'INV001', now, 'system@example.com', now, 'system@example.com', 'Active', 'Approved',
+        'INV-001', 'CAS001', 'Financial', 'admin@deczambia.gov.zm', 'Active', now, 
+        new Date(now.getTime() + 90*24*60*60*1000), 50000, 'Medium', 'Investigate financial transactions and identify money laundering patterns', 25, 'Initial analysis completed'
+      ]);
+      break;
+      
+    case 'prosecutions':
+      sampleData.push([
+        'PRO001', now, 'system@example.com', now, 'system@example.com', 'Active', 'Approved',
+        'PRO-001', 'INV001', 'Criminal', 'admin@deczambia.gov.zm', 'High Court of Zambia', 'HCZ/2024/001',
+        'Money laundering contrary to the Financial Intelligence Centre Act', now, 
+        new Date(now.getTime() + 60*24*60*60*1000), 'Filed', 'Pending', ''
+      ]);
+      break;
+  }
+  
+  return sampleData;
 }
 
 // Utility Functions
@@ -634,11 +916,12 @@ function logSecurityEvent(eventType, userEmail, details) {
       eventType,
       userEmail || 'Unknown',
       details,
-      Session.getActiveUser().getEmail(),
-      JSON.stringify({
-        userAgent: Session.getActiveUser().getEmail(),
-        timestamp: timestamp.toISOString()
-      })
+      'Unknown IP', // In production, get real IP
+      'Unknown Agent', // In production, get real user agent
+      'Unknown Location', // In production, get real location
+      'INFO',
+      'LOGGED',
+      'None'
     ]);
   } catch (error) {
     console.error('Error logging security event:', error);
@@ -667,18 +950,19 @@ function createUserSession(user) {
 function getUserByEmail(email) {
   try {
     const sheet = getSheet(CONFIG.SHEETS.USERS);
-    const data = sheet.getDataRange().getValues();
+    const data_range = sheet.getDataRange();
+    const values = data_range.getValues();
     
-    for (let i = 1; i < data.length; i++) {
-      if (data[i][3] === email) { // Assuming email is in column 4
+    for (let i = 1; i < values.length; i++) {
+      if (values[i][2] === email) { // Email column is index 2
         return {
-          id: data[i][0],
-          name: data[i][1],
-          email: data[i][3],
-          role: data[i][4],
-          hashedPassword: data[i][5],
-          isActive: data[i][6],
-          isLocked: data[i][7]
+          id: values[i][0],
+          name: values[i][1],
+          email: values[i][2],
+          role: values[i][3],
+          hashedPassword: values[i][4],
+          isActive: values[i][5],
+          isLocked: values[i][6]
         };
       }
     }
@@ -689,12 +973,40 @@ function getUserByEmail(email) {
   }
 }
 
+function sendPasswordResetEmail(email, resetToken) {
+  try {
+    const resetUrl = `${ScriptApp.getService().getUrl()}?resetToken=${resetToken}`;
+    const subject = 'AML System - Password Reset Request';
+    const body = `
+      Dear User,
+      
+      You have requested a password reset for your AML System account.
+      
+      Please click the following link to reset your password:
+      ${resetUrl}
+      
+      This link will expire in 30 minutes.
+      
+      If you did not request this reset, please ignore this email.
+      
+      Best regards,
+      AML System Administration Team
+    `;
+    
+    GmailApp.sendEmail(email, subject, body);
+    
+  } catch (error) {
+    console.error('Email sending error:', error);
+  }
+}
+
 // Initialize system on first run
 function onOpen() {
   const ui = SpreadsheetApp.getUi();
   ui.createMenu('AML System')
     .addItem('Initialize System', 'initializeSystem')
     .addItem('Create Admin User', 'createAdminUser')
+    .addItem('Create Sample Data', 'createSampleData')
     .addToUi();
 }
 
@@ -704,40 +1016,46 @@ function initializeSystem() {
     
     // Initialize all required sheets
     Object.values(CONFIG.SHEETS).forEach(sheetName => {
+      console.log(`Initializing sheet: ${sheetName}`);
       getSheet(sheetName);
     });
     
-    // Initialize Users sheet with default admin
-    initializeUsersSheet();
+    // Initialize module sheets
+    Object.keys(MODULE_CONFIG).forEach(moduleKey => {
+      const sheetName = MODULE_CONFIG[moduleKey].sheetName;
+      console.log(`Initializing module sheet: ${sheetName}`);
+      getSheet(sheetName);
+    });
     
     console.log('System initialized successfully');
+    SpreadsheetApp.getUi().alert('System initialized successfully!');
   } catch (error) {
     console.error('Error initializing system:', error);
-  }
-}
-
-function initializeUsersSheet() {
-  const sheet = getSheet(CONFIG.SHEETS.USERS);
-  
-  if (sheet.getLastRow() <= 1) {
-    // Add headers
-    const headers = [
-      'ID', 'Name', 'Email', 'Role', 'HashedPassword', 'IsActive', 'IsLocked',
-      'Created', 'LastLogin', 'LoginAttempts', 'AccountExpiry', 'InvitationCode'
-    ];
-    
-    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
-    sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold');
-    sheet.setFrozenRows(1);
+    SpreadsheetApp.getUi().alert('Error initializing system: ' + error.message);
   }
 }
 
 function createAdminUser() {
   try {
     const sheet = getSheet(CONFIG.SHEETS.USERS);
+    
+    // Check if admin user already exists
+    const data_range = sheet.getDataRange();
+    const values = data_range.getValues();
+    
+    for (let i = 1; i < values.length; i++) {
+      if (values[i][2] === 'admin@deczambia.gov.zm') {
+        console.log('Admin user already exists');
+        SpreadsheetApp.getUi().alert('Admin user already exists!');
+        return;
+      }
+    }
+    
     const adminId = generateId('ADM');
     const adminPassword = 'Admin@123';
     const hashedPassword = hashPassword(adminPassword);
+    const now = new Date();
+    const accountExpiry = new Date(Date.now() + (CONFIG.SECURITY.ACCOUNT_VALIDITY_DAYS * 24 * 60 * 60 * 1000));
     
     sheet.appendRow([
       adminId,
@@ -747,20 +1065,114 @@ function createAdminUser() {
       hashedPassword,
       true,
       false,
-      new Date(),
+      now,
       null,
       0,
-      new Date(Date.now() + (CONFIG.SECURITY.ACCOUNT_VALIDITY_DAYS * 24 * 60 * 60 * 1000)),
-      null
+      accountExpiry,
+      null,
+      '+260971234567',
+      'Administration',
+      'System Administrator',
+      'ADMIN001',
+      'Top Secret',
+      false,
+      'English',
+      'Africa/Lusaka',
+      now,
+      false,
+      '',
+      '+260971234567',
+      'Default admin user'
     ]);
     
     console.log('Admin user created successfully');
     console.log('Email: admin@deczambia.gov.zm');
     console.log('Password: Admin@123');
     
+    SpreadsheetApp.getUi().alert('Admin user created successfully!\n\nEmail: admin@deczambia.gov.zm\nPassword: Admin@123');
+    
   } catch (error) {
     console.error('Error creating admin user:', error);
+    SpreadsheetApp.getUi().alert('Error creating admin user: ' + error.message);
   }
+}
+
+function createSampleData() {
+  try {
+    console.log('Creating sample data...');
+    
+    // Create sample users
+    createSampleUsers();
+    
+    console.log('Sample data created successfully');
+    SpreadsheetApp.getUi().alert('Sample data created successfully!');
+  } catch (error) {
+    console.error('Error creating sample data:', error);
+    SpreadsheetApp.getUi().alert('Error creating sample data: ' + error.message);
+  }
+}
+
+function createSampleUsers() {
+  const sheet = getSheet(CONFIG.SHEETS.USERS);
+  const now = new Date();
+  const accountExpiry = new Date(Date.now() + (CONFIG.SECURITY.ACCOUNT_VALIDITY_DAYS * 24 * 60 * 60 * 1000));
+  
+  const sampleUsers = [
+    {
+      name: 'National Manager',
+      email: 'national@deczambia.gov.zm',
+      role: CONFIG.USER_ROLES.NATIONAL_MANAGER,
+      department: 'National Office',
+      position: 'National Manager'
+    },
+    {
+      name: 'Regional Manager',
+      email: 'regional@deczambia.gov.zm', 
+      role: CONFIG.USER_ROLES.REGIONAL_MANAGER,
+      department: 'Regional Office',
+      position: 'Regional Manager'
+    },
+    {
+      name: 'Case Officer',
+      email: 'officer@deczambia.gov.zm',
+      role: CONFIG.USER_ROLES.CASE_OFFICER,
+      department: 'Investigations',
+      position: 'Senior Case Officer'
+    }
+  ];
+  
+  sampleUsers.forEach(user => {
+    const userId = generateId('USR');
+    const hashedPassword = hashPassword('Password@123');
+    
+    sheet.appendRow([
+      userId,
+      user.name,
+      user.email,
+      user.role,
+      hashedPassword,
+      true,
+      false,
+      now,
+      null,
+      0,
+      accountExpiry,
+      null,
+      '+260971234567',
+      user.department,
+      user.position,
+      'BADGE' + userId.substr(-3),
+      'Secret',
+      false,
+      'English',
+      'Africa/Lusaka',
+      now,
+      false,
+      '',
+      '+260971234567',
+      'Sample user account'
+    ]);
+  });
 }
 
 // CRUD Operations Handler Functions
@@ -1206,12 +1618,12 @@ function hasPermission(user, module, permission) {
     if (!rolePermissions) return false;
     
     // Check if user has access to module
-    if (!rolePermissions.modules.includes(module) && !rolePermissions.modules.includes('*')) {
+    if (!rolePermissions.modules.includes(module) && module !== 'admin') {
       return false;
     }
     
     // Check if user has the required permission
-    if (!rolePermissions.permissions.includes(permission) && !rolePermissions.permissions.includes('*')) {
+    if (!rolePermissions.permissions.includes(permission)) {
       return false;
     }
     
@@ -1381,7 +1793,7 @@ function isValidDate(dateString) {
 // Utility Functions
 function logActivity(action, module, recordId, userEmail) {
   try {
-    const sheet = getSheet('ActivityLog');
+    const sheet = getSheet(CONFIG.SHEETS.ACTIVITY_LOG);
     sheet.appendRow([
       generateId('ACT'),
       new Date(),
@@ -1392,7 +1804,10 @@ function logActivity(action, module, recordId, userEmail) {
       JSON.stringify({
         timestamp: new Date().toISOString(),
         userAgent: 'GoogleAppsScript'
-      })
+      }),
+      'Unknown',
+      'GoogleAppsScript',
+      'N/A'
     ]);
   } catch (error) {
     console.error('Activity log error:', error);
