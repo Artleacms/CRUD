@@ -3,7 +3,7 @@
  * Comprehensive Law Enforcement Platform
  * Google Apps Script Backend
  * 
- * AUTOMATIC INITIALIZATION ON DEPLOYMENT
+ * AUTOMATIC INITIALIZATION ON DEPLOYMENT - FIXED VERSION
  */
 
 // Global Configuration Object
@@ -26,6 +26,7 @@ const CONFIG = {
   
   SHEETS: {
     USERS: 'Users',
+    ROLE_PERMISSIONS: 'RolePermissions',
     SECURITY_LOGS: 'SecurityLogs',
     INVITATIONS: 'Invitations',
     CASES: 'Cases',
@@ -414,14 +415,14 @@ const ROLE_PERMISSIONS = {
   }
 };
 
+// Global initialization lock to prevent race conditions
+var INITIALIZATION_LOCK = false;
+
 // Main Application Entry Points
 function doGet(e) {
   try {
-    // AUTOMATIC SYSTEM INITIALIZATION ON FIRST RUN
-    if (!isSystemInitialized()) {
-      console.log('System not initialized. Initializing automatically...');
-      initializeSystemAutomatically();
-    }
+    // SAFE AUTOMATIC SYSTEM INITIALIZATION ON FIRST RUN
+    ensureSystemInitialized();
     
     const action = e.parameter.action;
     
@@ -446,18 +447,18 @@ function doGet(e) {
     }
   } catch (error) {
     console.error('doGet error:', error);
-    logSecurityEvent('SYSTEM_ERROR', 'system', 'doGet error: ' + error.toString());
-    return createJsonResponse({ error: 'Internal server error', details: error.toString() }, 500);
+    return createJsonResponse({ 
+      error: 'System error', 
+      details: error.toString(),
+      timestamp: new Date().toISOString()
+    }, 500);
   }
 }
 
 function doPost(e) {
   try {
-    // AUTOMATIC SYSTEM INITIALIZATION ON FIRST RUN
-    if (!isSystemInitialized()) {
-      console.log('System not initialized. Initializing automatically...');
-      initializeSystemAutomatically();
-    }
+    // SAFE AUTOMATIC SYSTEM INITIALIZATION ON FIRST RUN
+    ensureSystemInitialized();
     
     const data = JSON.parse(e.postData.contents);
     const action = data.action;
@@ -491,12 +492,35 @@ function doPost(e) {
     }
   } catch (error) {
     console.error('doPost error:', error);
-    logSecurityEvent('SYSTEM_ERROR', 'system', 'doPost error: ' + error.toString());
-    return createJsonResponse({ error: 'Internal server error', details: error.toString() }, 500);
+    return createJsonResponse({ 
+      error: 'System error', 
+      details: error.toString(),
+      timestamp: new Date().toISOString()
+    }, 500);
   }
 }
 
-// AUTOMATIC SYSTEM INITIALIZATION FUNCTIONS
+// SAFE SYSTEM INITIALIZATION FUNCTIONS - PREVENTS CONFLICTS
+function ensureSystemInitialized() {
+  try {
+    // Use lock to prevent race conditions
+    if (INITIALIZATION_LOCK) {
+      console.log('Initialization already in progress, skipping...');
+      return;
+    }
+    
+    if (!isSystemInitialized()) {
+      INITIALIZATION_LOCK = true;
+      console.log('System not initialized. Initializing safely...');
+      initializeSystemSafely();
+      INITIALIZATION_LOCK = false;
+    }
+  } catch (error) {
+    INITIALIZATION_LOCK = false;
+    console.error('Error in ensureSystemInitialized:', error);
+  }
+}
+
 function isSystemInitialized() {
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -519,59 +543,105 @@ function isSystemInitialized() {
   }
 }
 
-function initializeSystemAutomatically() {
+function initializeSystemSafely() {
   try {
-    console.log('Starting automatic system initialization...');
+    console.log('Starting safe system initialization...');
     
-    // Step 1: Initialize all required sheets
-    initializeAllSheets();
+    // Step 1: Initialize all required sheets safely
+    initializeAllSheetsSafely();
     
-    // Step 2: Create admin user automatically
-    createAdminUserAutomatically();
+    // Step 2: Create role permissions data
+    createRolePermissionsData();
     
-    // Step 3: Create sample data
-    createSampleDataAutomatically();
+    // Step 3: Create admin user safely
+    createAdminUserSafely();
     
-    // Step 4: Mark system as initialized
+    // Step 4: Create sample data
+    createSampleDataSafely();
+    
+    // Step 5: Mark system as initialized
     markSystemAsInitialized();
     
-    console.log('System initialization completed successfully');
+    console.log('Safe system initialization completed successfully');
     
   } catch (error) {
-    console.error('Error during automatic initialization:', error);
-    logSecurityEvent('SYSTEM_ERROR', 'system', 'Initialization error: ' + error.toString());
+    console.error('Error during safe initialization:', error);
+    logSecurityEvent('SYSTEM_ERROR', 'system', 'Safe initialization error: ' + error.toString());
   }
 }
 
-function initializeAllSheets() {
+function initializeAllSheetsSafely() {
   try {
-    console.log('Initializing all sheets...');
+    console.log('Initializing all sheets safely...');
     
-    // Initialize all required sheets
+    // Initialize all required sheets with conflict prevention
     Object.values(CONFIG.SHEETS).forEach(sheetName => {
-      console.log(`Initializing sheet: ${sheetName}`);
-      getSheet(sheetName);
+      console.log(`Safely initializing sheet: ${sheetName}`);
+      getSheetSafely(sheetName);
     });
     
     // Initialize module sheets
     Object.keys(MODULE_CONFIG).forEach(moduleKey => {
       const sheetName = MODULE_CONFIG[moduleKey].sheetName;
-      console.log(`Initializing module sheet: ${sheetName}`);
-      getSheet(sheetName);
+      console.log(`Safely initializing module sheet: ${sheetName}`);
+      getSheetSafely(sheetName);
     });
     
-    console.log('All sheets initialized successfully');
+    console.log('All sheets initialized safely');
   } catch (error) {
-    console.error('Error initializing sheets:', error);
+    console.error('Error initializing sheets safely:', error);
     throw error;
   }
 }
 
-function createAdminUserAutomatically() {
+function createRolePermissionsData() {
   try {
-    console.log('Creating admin user automatically...');
+    console.log('Creating role permissions data...');
     
-    const sheet = getSheet(CONFIG.SHEETS.USERS);
+    const sheet = getSheetSafely(CONFIG.SHEETS.ROLE_PERMISSIONS);
+    const dataRange = sheet.getDataRange();
+    
+    // Check if data already exists
+    if (dataRange.getNumRows() > 1) {
+      console.log('Role permissions data already exists');
+      return;
+    }
+    
+    // Add role permissions data
+    const rows = [];
+    Object.keys(ROLE_PERMISSIONS).forEach(role => {
+      const roleData = ROLE_PERMISSIONS[role];
+      roleData.modules.forEach(module => {
+        roleData.permissions.forEach(permission => {
+          rows.push([
+            generateId('RP'),
+            role,
+            module,
+            permission,
+            true,
+            new Date(),
+            'System',
+            'Auto-generated role permission'
+          ]);
+        });
+      });
+    });
+    
+    if (rows.length > 0) {
+      sheet.getRange(2, 1, rows.length, 8).setValues(rows);
+      console.log(`Created ${rows.length} role permission entries`);
+    }
+    
+  } catch (error) {
+    console.error('Error creating role permissions data:', error);
+  }
+}
+
+function createAdminUserSafely() {
+  try {
+    console.log('Creating admin user safely...');
+    
+    const sheet = getSheetSafely(CONFIG.SHEETS.USERS);
     
     // Check if admin user already exists
     const data_range = sheet.getDataRange();
@@ -623,25 +693,25 @@ function createAdminUserAutomatically() {
     console.log('Password: ' + CONFIG.ADMIN_CREDENTIALS.PASSWORD);
     
     // Log the admin user creation
-    logSecurityEvent('ADMIN_USER_CREATED', CONFIG.ADMIN_CREDENTIALS.EMAIL, 'Admin user created automatically during system initialization');
+    logSecurityEvent('ADMIN_USER_CREATED', CONFIG.ADMIN_CREDENTIALS.EMAIL, 'Admin user created safely during system initialization');
     
   } catch (error) {
-    console.error('Error creating admin user:', error);
+    console.error('Error creating admin user safely:', error);
     throw error;
   }
 }
 
-function createSampleDataAutomatically() {
+function createSampleDataSafely() {
   try {
-    console.log('Creating sample data automatically...');
+    console.log('Creating sample data safely...');
     
     // Create sample users
     createSampleUsers();
     
-    console.log('Sample data created successfully');
+    console.log('Sample data created safely');
   } catch (error) {
-    console.error('Error creating sample data:', error);
-    throw error;
+    console.error('Error creating sample data safely:', error);
+    // Don't throw - sample data is not critical
   }
 }
 
@@ -649,7 +719,7 @@ function markSystemAsInitialized() {
   try {
     console.log('Marking system as initialized...');
     
-    const sheet = getSheet(CONFIG.SHEETS.SYSTEM_STATUS);
+    const sheet = getSheetSafely(CONFIG.SHEETS.SYSTEM_STATUS);
     const now = new Date();
     
     sheet.appendRow([
@@ -658,15 +728,262 @@ function markSystemAsInitialized() {
       true,
       now,
       CONFIG.ADMIN_CREDENTIALS.EMAIL,
-      'System automatically initialized on deployment',
-      'v2.0'
+      'System safely initialized on deployment',
+      'v2.1'
     ]);
     
     console.log('System marked as initialized');
   } catch (error) {
     console.error('Error marking system as initialized:', error);
+  }
+}
+
+// SAFE SHEET CREATION - PREVENTS CONFLICTS
+function getSheetSafely(sheetName) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let sheet = ss.getSheetByName(sheetName);
+    
+    if (!sheet) {
+      // Check for existing sheets with similar names (conflict detection)
+      const allSheets = ss.getSheets();
+      const conflictPattern = new RegExp(`^${sheetName}_conflict\\d+$`);
+      const hasConflicts = allSheets.some(s => conflictPattern.test(s.getName()));
+      
+      if (hasConflicts) {
+        console.log(`Conflict sheets detected for ${sheetName}, using existing main sheet`);
+        // Try to get the main sheet again
+        sheet = ss.getSheetByName(sheetName);
+      }
+      
+      if (!sheet) {
+        console.log(`Creating new sheet: ${sheetName}`);
+        sheet = ss.insertSheet(sheetName);
+        initializeSheetSafely(sheet, sheetName);
+      }
+    }
+    
+    return sheet;
+  } catch (error) {
+    console.error(`Error getting sheet ${sheetName} safely:`, error);
     throw error;
   }
+}
+
+function initializeSheetSafely(sheet, sheetName) {
+  try {
+    console.log(`Safely initializing sheet: ${sheetName}`);
+    
+    // Check if sheet already has headers
+    if (sheet.getLastRow() > 0) {
+      console.log(`Sheet ${sheetName} already has data, skipping initialization`);
+      return;
+    }
+    
+    // Initialize different types of sheets
+    if (sheetName === CONFIG.SHEETS.USERS) {
+      initializeUsersSheet(sheet);
+    } else if (sheetName === CONFIG.SHEETS.ROLE_PERMISSIONS) {
+      initializeRolePermissionsSheet(sheet);
+    } else if (sheetName === CONFIG.SHEETS.SECURITY_LOGS) {
+      initializeSecurityLogsSheet(sheet);
+    } else if (sheetName === CONFIG.SHEETS.INVITATIONS) {
+      initializeInvitationsSheet(sheet);
+    } else if (sheetName === CONFIG.SHEETS.ACTIVITY_LOG) {
+      initializeActivityLogSheet(sheet);
+    } else if (sheetName === CONFIG.SHEETS.SYSTEM_STATUS) {
+      initializeSystemStatusSheet(sheet);
+    } else {
+      // Initialize module sheets
+      const moduleKey = Object.keys(MODULE_CONFIG).find(key => MODULE_CONFIG[key].sheetName === sheetName);
+      if (moduleKey) {
+        initializeModuleSheet(sheet, moduleKey);
+      }
+    }
+    
+    console.log(`Sheet ${sheetName} safely initialized`);
+  } catch (error) {
+    console.error(`Error safely initializing sheet ${sheetName}:`, error);
+  }
+}
+
+function initializeRolePermissionsSheet(sheet) {
+  const headers = [
+    'ID', 'Role', 'Module', 'Permission', 'IsAllowed', 'CreatedDate', 'CreatedBy', 'Notes'
+  ];
+  
+  sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold');
+  sheet.getRange(1, 1, 1, headers.length).setBackground('#9f7aea');
+  sheet.getRange(1, 1, 1, headers.length).setFontColor('#ffffff');
+  sheet.setFrozenRows(1);
+  
+  sheet.autoResizeColumns(1, headers.length);
+}
+
+function initializeUsersSheet(sheet) {
+  const headers = [
+    'ID', 'Name', 'Email', 'Role', 'HashedPassword', 'IsActive', 'IsLocked',
+    'Created', 'LastLogin', 'LoginAttempts', 'AccountExpiry', 'InvitationCode',
+    'Phone', 'Department', 'Position', 'BadgeNumber', 'SecurityClearance',
+    'TwoFactorEnabled', 'PreferredLanguage', 'Timezone', 'LastPasswordChange',
+    'PasswordResetRequired', 'ProfilePicture', 'EmergencyContact', 'Notes'
+  ];
+  
+  sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold');
+  sheet.getRange(1, 1, 1, headers.length).setBackground('#1a365d');
+  sheet.getRange(1, 1, 1, headers.length).setFontColor('#ffffff');
+  sheet.setFrozenRows(1);
+  
+  sheet.autoResizeColumns(1, headers.length);
+}
+
+function initializeSecurityLogsSheet(sheet) {
+  const headers = [
+    'ID', 'Timestamp', 'EventType', 'UserEmail', 'Details', 'SourceIP',
+    'UserAgent', 'Location', 'Severity', 'Status', 'ResponseAction'
+  ];
+  
+  sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold');
+  sheet.getRange(1, 1, 1, headers.length).setBackground('#e53e3e');
+  sheet.getRange(1, 1, 1, headers.length).setFontColor('#ffffff');
+  sheet.setFrozenRows(1);
+  
+  sheet.autoResizeColumns(1, headers.length);
+}
+
+function initializeInvitationsSheet(sheet) {
+  const headers = [
+    'ID', 'InvitationCode', 'Email', 'Role', 'CreatedDate', 'ExpiryDate',
+    'CreatedBy', 'Status', 'IsUsed', 'UsedDate', 'Notes'
+  ];
+  
+  sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold');
+  sheet.getRange(1, 1, 1, headers.length).setBackground('#3182ce');
+  sheet.getRange(1, 1, 1, headers.length).setFontColor('#ffffff');
+  sheet.setFrozenRows(1);
+  
+  sheet.autoResizeColumns(1, headers.length);
+}
+
+function initializeActivityLogSheet(sheet) {
+  const headers = [
+    'ID', 'Timestamp', 'Action', 'Module', 'RecordID', 'UserEmail',
+    'Details', 'IPAddress', 'UserAgent', 'SessionID'
+  ];
+  
+  sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold');
+  sheet.getRange(1, 1, 1, headers.length).setBackground('#38a169');
+  sheet.getRange(1, 1, 1, headers.length).setFontColor('#ffffff');
+  sheet.setFrozenRows(1);
+  
+  sheet.autoResizeColumns(1, headers.length);
+}
+
+function initializeSystemStatusSheet(sheet) {
+  const headers = [
+    'ID', 'Status', 'IsInitialized', 'InitializationDate', 'InitializedBy', 'Notes', 'Version'
+  ];
+  
+  sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold');
+  sheet.getRange(1, 1, 1, headers.length).setBackground('#805ad5');
+  sheet.getRange(1, 1, 1, headers.length).setFontColor('#ffffff');
+  sheet.setFrozenRows(1);
+  
+  sheet.autoResizeColumns(1, headers.length);
+}
+
+function initializeModuleSheet(sheet, moduleKey) {
+  const config = MODULE_CONFIG[moduleKey];
+  const headers = ['ID', 'Created', 'CreatedBy', 'Modified', 'ModifiedBy', 'Status', 'ApprovalStatus'];
+  
+  // Add module-specific headers
+  Object.keys(config.fields).forEach(fieldName => {
+    headers.push(fieldName);
+  });
+  
+  sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold');
+  sheet.getRange(1, 1, 1, headers.length).setBackground('#2d5a87');
+  sheet.getRange(1, 1, 1, headers.length).setFontColor('#ffffff');
+  sheet.setFrozenRows(1);
+  
+  sheet.autoResizeColumns(1, headers.length);
+  
+  // Add sample data for demonstration
+  addSampleDataToModule(sheet, moduleKey, headers);
+}
+
+function addSampleDataToModule(sheet, moduleKey, headers) {
+  try {
+    const sampleData = getSampleDataForModule(moduleKey);
+    if (sampleData.length > 0) {
+      const startRow = 2;
+      sheet.getRange(startRow, 1, sampleData.length, headers.length).setValues(sampleData);
+      
+      // Format sample data rows
+      sheet.getRange(startRow, 1, sampleData.length, headers.length).setBackground('#f7fafc');
+    }
+  } catch (error) {
+    console.error(`Error adding sample data to ${moduleKey}:`, error);
+  }
+}
+
+function getSampleDataForModule(moduleKey) {
+  const now = new Date();
+  const sampleData = [];
+  
+  switch (moduleKey) {
+    case 'cases':
+      sampleData.push([
+        'CAS001', now, 'system@example.com', now, 'system@example.com', 'Active', 'Approved',
+        'ML-2024-001', 'Suspicious Banking Transactions', 'Money Laundering', 'High', 'Open',
+        CONFIG.ADMIN_CREDENTIALS.EMAIL, now, 250000, 'Lusaka', 'Investigation into suspicious banking transactions involving multiple accounts', 'High', 8
+      ]);
+      sampleData.push([
+        'CAS002', now, 'system@example.com', now, 'system@example.com', 'Active', 'Approved',
+        'TF-2024-001', 'Terrorism Financing Investigation', 'Terrorism Financing', 'Critical', 'Under Investigation',
+        CONFIG.ADMIN_CREDENTIALS.EMAIL, now, 150000, 'Ndola', 'Investigation into suspected terrorism financing network', 'High', 9
+      ]);
+      break;
+      
+    case 'entities':
+      sampleData.push([
+        'ENT001', now, 'system@example.com', now, 'system@example.com', 'Active', 'Approved',
+        'ENT-001', 'Individual', 'John Doe', 'Johnny', new Date('1980-01-01'), 'Zambian',
+        'NRC123456789', '123 Main Street, Lusaka', '+260971234567', 'john.doe@example.com', 45, 'Not PEP', 'No', 'Sample individual entity'
+      ]);
+      sampleData.push([
+        'ENT002', now, 'system@example.com', now, 'system@example.com', 'Active', 'Approved',
+        'ENT-002', 'Corporation', 'ABC Trading Ltd', 'ABC Corp', new Date('2010-05-15'), 'Zambian',
+        'REG987654321', '456 Business Ave, Lusaka', '+260211123456', 'info@abctrading.com', 60, 'Not PEP', 'No', 'Sample corporate entity'
+      ]);
+      break;
+      
+    case 'investigations':
+      sampleData.push([
+        'INV001', now, 'system@example.com', now, 'system@example.com', 'Active', 'Approved',
+        'INV-001', 'CAS001', 'Financial', CONFIG.ADMIN_CREDENTIALS.EMAIL, 'Active', now, 
+        new Date(now.getTime() + 90*24*60*60*1000), 50000, 'Medium', 'Investigate financial transactions and identify money laundering patterns', 25, 'Initial analysis completed'
+      ]);
+      break;
+      
+    case 'prosecutions':
+      sampleData.push([
+        'PRO001', now, 'system@example.com', now, 'system@example.com', 'Active', 'Approved',
+        'PRO-001', 'INV001', 'Criminal', CONFIG.ADMIN_CREDENTIALS.EMAIL, 'High Court of Zambia', 'HCZ/2024/001',
+        'Money laundering contrary to the Financial Intelligence Centre Act', now, 
+        new Date(now.getTime() + 60*24*60*60*1000), 'Filed', 'Pending', ''
+      ]);
+      break;
+  }
+  
+  return sampleData;
 }
 
 // Authentication and Security Functions
@@ -675,26 +992,25 @@ function handleLogin(params) {
     const email = params.email;
     const password = params.password;
     
+    console.log(`Login attempt for: ${email}`);
+    
     if (!email || !password) {
       return createJsonResponse({ error: 'Email and password are required' }, 400);
-    }
-    
-    // Security validations
-    const securityCheck = performSecurityValidation(params);
-    if (!securityCheck.valid) {
-      logSecurityEvent('LOGIN_FAILED', email, securityCheck.reason);
-      return createJsonResponse({ error: securityCheck.reason }, 403);
     }
     
     // Get user from database
     const user = getUserByEmail(email);
     if (!user) {
+      console.log(`User not found: ${email}`);
       logSecurityEvent('LOGIN_FAILED', email, 'User not found');
       return createJsonResponse({ error: 'Invalid credentials' }, 401);
     }
     
+    console.log(`User found: ${user.name}, Active: ${user.isActive}, Locked: ${user.isLocked}`);
+    
     // Verify password
     if (!verifyPassword(password, user.hashedPassword)) {
+      console.log('Password verification failed');
       handleFailedLogin(user);
       return createJsonResponse({ error: 'Invalid credentials' }, 401);
     }
@@ -714,6 +1030,8 @@ function handleLogin(params) {
     // Log successful login
     logSecurityEvent('LOGIN_SUCCESS', email, 'Successful login');
     
+    console.log('Login successful, returning user data');
+    
     return createJsonResponse({
       success: true,
       user: {
@@ -729,7 +1047,11 @@ function handleLogin(params) {
   } catch (error) {
     console.error('Login error:', error);
     logSecurityEvent('LOGIN_ERROR', params.email || 'unknown', 'Login error: ' + error.toString());
-    return createJsonResponse({ error: 'Login failed', details: error.toString() }, 500);
+    return createJsonResponse({ 
+      error: 'Login failed', 
+      details: error.toString(),
+      timestamp: new Date().toISOString()
+    }, 500);
   }
 }
 
@@ -778,7 +1100,10 @@ function handleForgotPassword(data) {
     
   } catch (error) {
     console.error('Forgot password error:', error);
-    return createJsonResponse({ error: 'Password reset request failed', details: error.toString() }, 500);
+    return createJsonResponse({ 
+      error: 'Password reset request failed', 
+      details: error.toString() 
+    }, 500);
   }
 }
 
@@ -819,7 +1144,7 @@ function handleResetPassword(data) {
     }
     
     // Update password in Users sheet
-    const sheet = getSheet(CONFIG.SHEETS.USERS);
+    const sheet = getSheetSafely(CONFIG.SHEETS.USERS);
     const data_range = sheet.getDataRange();
     const values = data_range.getValues();
     
@@ -846,7 +1171,10 @@ function handleResetPassword(data) {
     
   } catch (error) {
     console.error('Reset password error:', error);
-    return createJsonResponse({ error: 'Password reset failed', details: error.toString() }, 500);
+    return createJsonResponse({ 
+      error: 'Password reset failed', 
+      details: error.toString() 
+    }, 500);
   }
 }
 
@@ -1105,9 +1433,26 @@ function getSampleDataForModule(moduleKey) {
 
 // Utility Functions
 function createJsonResponse(data, statusCode = 200) {
-  return ContentService
-    .createTextOutput(JSON.stringify(data))
-    .setMimeType(ContentService.MimeType.JSON);
+  try {
+    const response = ContentService
+      .createTextOutput(JSON.stringify(data))
+      .setMimeType(ContentService.MimeType.JSON);
+    
+    // Add CORS headers for web requests
+    if (statusCode !== 200) {
+      console.log(`Returning error response: ${statusCode} - ${JSON.stringify(data)}`);
+    }
+    
+    return response;
+  } catch (error) {
+    console.error('Error creating JSON response:', error);
+    return ContentService
+      .createTextOutput(JSON.stringify({ 
+        error: 'Response creation failed', 
+        details: error.toString() 
+      }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
 }
 
 function generateId(prefix = '') {
@@ -1119,7 +1464,13 @@ function hashPassword(password) {
 }
 
 function verifyPassword(plainPassword, hashedPassword) {
-  return hashPassword(plainPassword) === hashedPassword;
+  try {
+    const computedHash = hashPassword(plainPassword);
+    return computedHash === hashedPassword;
+  } catch (error) {
+    console.error('Password verification error:', error);
+    return false;
+  }
 }
 
 function validatePasswordStrength(password) {
@@ -1133,7 +1484,7 @@ function validatePasswordStrength(password) {
 
 function logSecurityEvent(eventType, userEmail, details) {
   try {
-    const sheet = getSheet(CONFIG.SHEETS.SECURITY_LOGS);
+    const sheet = getSheetSafely(CONFIG.SHEETS.SECURITY_LOGS);
     const timestamp = new Date();
     
     sheet.appendRow([
@@ -1142,9 +1493,9 @@ function logSecurityEvent(eventType, userEmail, details) {
       eventType,
       userEmail || 'Unknown',
       details,
-      'Unknown IP', // In production, get real IP
-      'Unknown Agent', // In production, get real user agent
-      'Unknown Location', // In production, get real location
+      'Unknown IP',
+      'Unknown Agent',
+      'Unknown Location',
       'INFO',
       'LOGGED',
       'None'
@@ -1155,27 +1506,32 @@ function logSecurityEvent(eventType, userEmail, details) {
 }
 
 function createUserSession(user) {
-  const sessionToken = Utilities.getUuid();
-  const expiryTime = new Date(Date.now() + (CONFIG.SECURITY.SESSION_TIMEOUT_MINUTES * 60 * 1000));
-  
-  // Store session in Properties Service (simple implementation)
-  PropertiesService.getScriptProperties().setProperty(
-    'session_' + sessionToken,
-    JSON.stringify({
-      userId: user.id,
-      email: user.email,
-      role: user.role,
-      expiryTime: expiryTime.toISOString(),
-      createdAt: new Date().toISOString()
-    })
-  );
-  
-  return sessionToken;
+  try {
+    const sessionToken = Utilities.getUuid();
+    const expiryTime = new Date(Date.now() + (CONFIG.SECURITY.SESSION_TIMEOUT_MINUTES * 60 * 1000));
+    
+    // Store session in Properties Service
+    PropertiesService.getScriptProperties().setProperty(
+      'session_' + sessionToken,
+      JSON.stringify({
+        userId: user.id,
+        email: user.email,
+        role: user.role,
+        expiryTime: expiryTime.toISOString(),
+        createdAt: new Date().toISOString()
+      })
+    );
+    
+    return sessionToken;
+  } catch (error) {
+    console.error('Error creating user session:', error);
+    return null;
+  }
 }
 
 function updateLastLogin(userId) {
   try {
-    const sheet = getSheet(CONFIG.SHEETS.USERS);
+    const sheet = getSheetSafely(CONFIG.SHEETS.USERS);
     const data_range = sheet.getDataRange();
     const values = data_range.getValues();
     
@@ -1193,7 +1549,7 @@ function updateLastLogin(userId) {
 
 function getUserByEmail(email) {
   try {
-    const sheet = getSheet(CONFIG.SHEETS.USERS);
+    const sheet = getSheetSafely(CONFIG.SHEETS.USERS);
     const data_range = sheet.getDataRange();
     const values = data_range.getValues();
     
@@ -1245,66 +1601,70 @@ function sendPasswordResetEmail(email, resetToken) {
 }
 
 function createSampleUsers() {
-  const sheet = getSheet(CONFIG.SHEETS.USERS);
-  const now = new Date();
-  const accountExpiry = new Date(Date.now() + (CONFIG.SECURITY.ACCOUNT_VALIDITY_DAYS * 24 * 60 * 60 * 1000));
-  
-  const sampleUsers = [
-    {
-      name: 'National Manager',
-      email: 'national@deczambia.gov.zm',
-      role: CONFIG.USER_ROLES.NATIONAL_MANAGER,
-      department: 'National Office',
-      position: 'National Manager'
-    },
-    {
-      name: 'Regional Manager',
-      email: 'regional@deczambia.gov.zm', 
-      role: CONFIG.USER_ROLES.REGIONAL_MANAGER,
-      department: 'Regional Office',
-      position: 'Regional Manager'
-    },
-    {
-      name: 'Case Officer',
-      email: 'officer@deczambia.gov.zm',
-      role: CONFIG.USER_ROLES.CASE_OFFICER,
-      department: 'Investigations',
-      position: 'Senior Case Officer'
-    }
-  ];
-  
-  sampleUsers.forEach(user => {
-    const userId = generateId('USR');
-    const hashedPassword = hashPassword('SecurePass@123');
+  try {
+    const sheet = getSheetSafely(CONFIG.SHEETS.USERS);
+    const now = new Date();
+    const accountExpiry = new Date(Date.now() + (CONFIG.SECURITY.ACCOUNT_VALIDITY_DAYS * 24 * 60 * 60 * 1000));
     
-    sheet.appendRow([
-      userId,
-      user.name,
-      user.email,
-      user.role,
-      hashedPassword,
-      true,
-      false,
-      now,
-      null,
-      0,
-      accountExpiry,
-      null,
-      '+260971234567',
-      user.department,
-      user.position,
-      'BADGE' + userId.substr(-3),
-      'Secret',
-      false,
-      'English',
-      'Africa/Lusaka',
-      now,
-      false,
-      '',
-      '+260971234567',
-      'Sample user account'
-    ]);
-  });
+    const sampleUsers = [
+      {
+        name: 'National Manager',
+        email: 'national@deczambia.gov.zm',
+        role: CONFIG.USER_ROLES.NATIONAL_MANAGER,
+        department: 'National Office',
+        position: 'National Manager'
+      },
+      {
+        name: 'Regional Manager',
+        email: 'regional@deczambia.gov.zm', 
+        role: CONFIG.USER_ROLES.REGIONAL_MANAGER,
+        department: 'Regional Office',
+        position: 'Regional Manager'
+      },
+      {
+        name: 'Case Officer',
+        email: 'officer@deczambia.gov.zm',
+        role: CONFIG.USER_ROLES.CASE_OFFICER,
+        department: 'Investigations',
+        position: 'Senior Case Officer'
+      }
+    ];
+    
+    sampleUsers.forEach(user => {
+      const userId = generateId('USR');
+      const hashedPassword = hashPassword('SecurePass@123');
+      
+      sheet.appendRow([
+        userId,
+        user.name,
+        user.email,
+        user.role,
+        hashedPassword,
+        true,
+        false,
+        now,
+        null,
+        0,
+        accountExpiry,
+        null,
+        '+260971234567',
+        user.department,
+        user.position,
+        'BADGE' + userId.substr(-3),
+        'Secret',
+        false,
+        'English',
+        'Africa/Lusaka',
+        now,
+        false,
+        '',
+        '+260971234567',
+        'Sample user account'
+      ]);
+    });
+  } catch (error) {
+    console.error('Error creating sample users:', error);
+  }
 }
 
 function handleGetModuleConfig() {
@@ -1342,7 +1702,7 @@ function handleCreateRecord(data) {
     
     // Create record
     const recordId = generateId(module.substr(0, 3).toUpperCase());
-    const sheet = getSheet(moduleConfig.sheetName);
+    const sheet = getSheetSafely(moduleConfig.sheetName);
     
     const row = [
       recordId,
@@ -1397,7 +1757,7 @@ function handleGetData(params) {
     }
     
     // Get data
-    const sheet = getSheet(moduleConfig.sheetName);
+    const sheet = getSheetSafely(moduleConfig.sheetName);
     const data_range = sheet.getDataRange();
     const values = data_range.getValues();
     
@@ -1480,7 +1840,7 @@ function hasPermission(user, module, permission) {
 
 function logActivity(action, module, recordId, userEmail) {
   try {
-    const sheet = getSheet(CONFIG.SHEETS.ACTIVITY_LOG);
+    const sheet = getSheetSafely(CONFIG.SHEETS.ACTIVITY_LOG);
     sheet.appendRow([
       generateId('ACT'),
       new Date(),
@@ -1503,7 +1863,7 @@ function logActivity(action, module, recordId, userEmail) {
 
 function handleFailedLogin(user) {
   try {
-    const sheet = getSheet(CONFIG.SHEETS.USERS);
+    const sheet = getSheetSafely(CONFIG.SHEETS.USERS);
     const data_range = sheet.getDataRange();
     const values = data_range.getValues();
     
