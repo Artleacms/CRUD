@@ -995,6 +995,7 @@
         let moduleConfigs = {};
         let clickCount = 0;
         let clickTimer = null;
+        let baseUrl = window.location.origin + window.location.pathname;
 
         // Initialize application
         document.addEventListener('DOMContentLoaded', function() {
@@ -1149,12 +1150,13 @@
             const password = document.getElementById('password').value;
             
             try {
-                const response = await fetch(window.location.href + '?action=login', {
+                const response = await fetch(baseUrl, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({
+                        action: 'login',
                         email: email,
                         password: password,
                         userAgent: navigator.userAgent,
@@ -1186,7 +1188,7 @@
             const email = document.getElementById('forgotEmail').value;
             
             try {
-                const response = await fetch(window.location.href, {
+                const response = await fetch(baseUrl, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -1225,7 +1227,7 @@
             }
             
             try {
-                const response = await fetch(window.location.href, {
+                const response = await fetch(baseUrl, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -1288,7 +1290,7 @@
 
         async function loadModuleConfigs() {
             try {
-                const response = await fetch(window.location.href + '?action=getModuleConfig');
+                const response = await fetch(baseUrl + '?action=getModuleConfig');
                 const result = await response.json();
                 moduleConfigs = result.modules;
             } catch (error) {
@@ -1315,7 +1317,7 @@
         async function loadModuleData(moduleName) {
             try {
                 const token = localStorage.getItem('sessionToken');
-                const response = await fetch(window.location.href + `?action=getData&module=${moduleName}&userToken=${token}`);
+                const response = await fetch(baseUrl + `?action=getData&module=${moduleName}&userToken=${token}`);
                 const result = await response.json();
                 
                 if (result.data) {
@@ -1471,7 +1473,7 @@
             
             try {
                 const token = localStorage.getItem('sessionToken');
-                const response = await fetch(window.location.href, {
+                const response = await fetch(baseUrl, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
